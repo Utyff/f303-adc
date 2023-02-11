@@ -28,14 +28,13 @@ uint8_t adcResolution = ADC_8BITS;
 uint8_t rccAdcDivider = 0b10001;
 
 // Delay for interleaved mode. Set only when ADEN=0
-// (SAMPLE_TIME + CONV. TIME) /2
-// (4.5 + 12.5) /2 = 8 tics
-// (1.5 + 8.5) /2 = 5 tics
+// circle time = SAMPLE_TIME + CONV. TIME = 1.5 + 8.5 = 10 tics
+// Delay = circle time /2 - SAMPLE_TIME = 10 / 2 - 1.5 = 3.5 tics
 // 0b0000 - 1
 // 0b0001 - 2
 // 0b0010 - 3
 // 0b0011 - 4   MAX: 1011 - 12
-uint8_t adcDelay = 0b0011;
+uint8_t adcDelay = 0b0010;
 
 //000: 1.5 ADC clock cycles
 //001: 2.5 ADC clock cycles
@@ -148,6 +147,8 @@ void ADC_start() {
 
     // ADC start conversion
     ADC1->CR |= ADC_CR_ADSTART;
+
+    __WFI();
 }
 
 void DMA_init() {
@@ -155,7 +156,8 @@ void DMA_init() {
     RCC->AHBENR |= RCC_AHBENR_DMA1EN;
 
     // Transfer complete interrupt enable and Circular mode
-    DMA1_Channel1->CCR |= DMA_CCR_TCIE | DMA_CCR_HTIE | DMA_CCR_TEIE | DMA_CCR_CIRC;
+    //DMA1_Channel1->CCR |= DMA_CCR_TCIE | DMA_CCR_HTIE | DMA_CCR_TEIE | DMA_CCR_CIRC;
+    DMA1_Channel1->CCR |= DMA_CCR_CIRC;
 
     // Memory increment mode
     DMA1_Channel1->CCR |= DMA_CCR_MINC;
@@ -172,6 +174,9 @@ void DMA_init() {
     // 10: 32-bits
     DMA1_Channel1->CCR |= (0b01u << DMA_CCR_MSIZE_Pos);
 
+    // Channel Priority level 11 - Very high
+    DMA1_Channel1->CCR |= DMA_CCR_PL_Msk;
+
     // Number of data to transfer. 2 samples in 1 transfer.
     DMA1_Channel1->CNDTR = BUF_SIZE / 2;
 
@@ -187,7 +192,7 @@ void DMA_init() {
     // Enable DMA
     DMA1_Channel1->CCR |= DMA_CCR_EN;
 
-    NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 CH1 interrupt
+//    NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 CH1 interrupt
 }
 
 uint16_t dmaG = 0;
