@@ -6,6 +6,7 @@ void ADC_start() __attribute__((section (".ccmram")));
 
 /**
  * ADC1 channel 1 - PA0
+ * ADC2 channel 1 - PA4
  */
 
 
@@ -36,7 +37,7 @@ uint8_t rccDivider = 0b10001;
 // 0b0001 - 2
 // 0b0010 - 3
 // 0b0011 - 4   MAX: 1011 - 12
-uint8_t interleaveDelay = 0b0010;
+uint8_t interleaveDelay = 0b0001;
 
 //000: 1.5 ADC clock cycles
 //001: 2.5 ADC clock cycles
@@ -53,7 +54,7 @@ uint8_t sampleTime = 0b000;
 // 01: HCLK/1 (Synchronous clock mode) AHB
 // 10: HCLK/2
 // 11: HCLK/4
-uint8_t adcClock = 0b10;
+uint8_t adcClock = 0b01;
 
 #define BUF_SIZE 4096
 uint8_t samplesBuffer[BUF_SIZE];
@@ -76,6 +77,7 @@ void ADC_init() {
 
     // Set mode b11 (analog input) for ADC pins
     GPIOA->MODER |= (0b11u << 0u);      // PA0 for ADC1 ch1
+    GPIOA->MODER |= (0b11u << (4 * 2)); // PA4 for ADC2 ch1
 
     RCC->AHBENR |= RCC_AHBENR_ADC12EN; // turn on ADC12 clock
 
@@ -87,14 +89,21 @@ void ADC_init() {
 
     // enable the ADC voltage regulator
     ADC1->CR &= ~ADC_CR_ADVREGEN_1;
+    ADC2->CR &= ~ADC_CR_ADVREGEN_1;
 
     ADC1->CR |= ADC_CR_ADVREGEN_0;
+    ADC2->CR |= ADC_CR_ADVREGEN_0;
     DWT_Delay_us(10); // voltage regulator startup time
 
     // start ADC calibration cycle
     ADC1->CR |= ADC_CR_ADCAL;
     // wait for calibration to complete
     while (ADC1->CR & ADC_CR_ADCAL);
+
+    // start ADC calibration cycle
+    ADC2->CR |= ADC_CR_ADCAL;
+    // wait for calibration to complete
+    while (ADC2->CR & ADC_CR_ADCAL);
 
 //    ADC_start();
 }
@@ -106,38 +115,44 @@ void ADC_start() {
 
     // enable the ADC
     ADC1->CR |= ADC_CR_ADEN;
+    ADC2->CR |= ADC_CR_ADEN;
     // wait till ADC start
     while (!(ADC1->ISR & ADC_ISR_ADRDY));
+    while (!(ADC2->ISR & ADC_ISR_ADRDY));
 
     // Select ADC Channels
     ADC1->SQR1 = (1u << ADC_SQR1_SQ1_Pos); // 1-st channel for ADC1
+    ADC2->SQR1 = (1u << ADC_SQR1_SQ1_Pos); // 1-st channel for ADC2
     // Regular channel sequence length - 1
     ADC1->SQR1 &= ~ADC_SQR1_L_Msk;
+    ADC2->SQR1 &= ~ADC_SQR1_L_Msk;
 
     // Set Prescaler ADC for Asynchronous clock mode
     MODIFY_REG(RCC->CFGR2, RCC_CFGR2_ADCPRE12_Msk, rccDivider << RCC_CFGR2_ADCPRE12_Pos);
 
     // Set sampling time for channels
     MODIFY_REG(ADC1->SMPR1, ADC_SMPR1_SMP1_Msk, sampleTime << ADC_SMPR1_SMP1_Pos); // ADC1 channel 1
+    MODIFY_REG(ADC2->SMPR1, ADC_SMPR1_SMP1_Msk, sampleTime << ADC_SMPR1_SMP1_Pos); // ADC2 channel 1
 
     // set data resolution
     MODIFY_REG(ADC1->CFGR, ADC_CFGR_RES_Msk, adcResolution << ADC_CFGR_RES_Pos);
+    MODIFY_REG(ADC2->CFGR, ADC_CFGR_RES_Msk, adcResolution << ADC_CFGR_RES_Pos);
 
-    // Enable continuous conversion mode
-    ADC1->CFGR |= ADC_CFGR_CONT;
+    // Enable continuous conversion mode. Only on the master
+    ADC1->CFGR |= ADC_CFGR_CONT; // Master ADC1 + ADC2
 
     // dual mode
     // 00000: Independent mode
     // 00110: Regular simultaneous mode only
     // 00111: Interleaved mode only
-    MODIFY_REG(ADC12_COMMON->CCR, ADC_CCR_DUAL_Msk, 0b00000u << ADC_CCR_DUAL_Pos);
+    MODIFY_REG(ADC12_COMMON->CCR, ADC_CCR_DUAL_Msk, 0b00111u << ADC_CCR_DUAL_Pos);
 
     // DMA mode.  0 -> One Shot; 1 -> Circular
     // 0 - stop when DMA_CCR_TCIE
-    ADC1->CFGR &= ~ADC_CFGR_DMACFG;
+    ADC12_COMMON->CCR &= ~ADC_CCR_DMACFG;
 
-    // enable DMA mode
-    ADC1->CFGR |= ADC_CFGR_DMAEN;
+    // COMMON DMA mode b11 - for 8-bit resolution
+    ADC12_COMMON->CCR |= (0b11u << ADC_CCR_MDMA_Pos);
 
     // ADC start conversion
     ADC1->CR |= ADC_CR_ADSTART;
@@ -164,15 +179,15 @@ void DMA_start() {
     // 00: 8-bits
     // 01: 16-bits
     // 10: 32-bits
-    DMA1_Channel1->CCR |= (0b00u << DMA_CCR_PSIZE_Pos);
+    DMA1_Channel1->CCR |= (0b01u << DMA_CCR_PSIZE_Pos);
     // Memory size
-    DMA1_Channel1->CCR |= (0b00u << DMA_CCR_MSIZE_Pos);
+    DMA1_Channel1->CCR |= (0b01u << DMA_CCR_MSIZE_Pos);
 
     // Channel Priority level 11 - Very high
     DMA1_Channel1->CCR |= DMA_CCR_PL_Msk;
 
-    // Number of data to transfer
-    DMA1_Channel1->CNDTR = BUF_SIZE;
+    // Number of data to transfer. 2 samples in 1 transfer.
+    DMA1_Channel1->CNDTR = BUF_SIZE / 2;
 
     // Peripheral address register
     DMA1_Channel1->CPAR = (uint32_t) &ADC12_COMMON->CDR;
