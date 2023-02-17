@@ -37,7 +37,7 @@ uint8_t rccDivider = 0b10000;
 // 0b0001 - 2
 // 0b0010 - 3
 // 0b0011 - 4   MAX: 1011 - 12
-uint8_t interleaveDelay = 0b0010;
+uint8_t interleaveDelay = 0b0001;
 
 //000: 1.5 ADC clock cycles
 //001: 2.5 ADC clock cycles
@@ -104,8 +104,6 @@ void ADC_init() {
     ADC2->CR |= ADC_CR_ADCAL;
     // wait for calibration to complete
     while (ADC2->CR & ADC_CR_ADCAL);
-
-//    ADC_start();
 }
 
 void ADC_start() {
@@ -145,8 +143,8 @@ void ADC_start() {
 
     // dual mode
     // 00000: Independent mode
-    // 00110: Regular simultaneous mode only
-    // 00111: Interleaved mode only
+    // 00110: Regular simultaneous mode
+    // 00111: Interleaved mode
     MODIFY_REG(ADC12_COMMON->CCR, ADC_CCR_DUAL_Msk, 0b00111u << ADC_CCR_DUAL_Pos);
 
     // DMA mode.  0 -> One Shot; 1 -> Circular
