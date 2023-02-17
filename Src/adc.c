@@ -28,7 +28,7 @@ uint8_t adcResolution = ADC_8BITS;
 // 0b11001: PLL clock divided by 64
 // 0b11010: PLL clock divided by 128
 // 0b11011: PLL clock divided by 256
-uint8_t rccDivider = 0b10001;
+uint8_t rccDivider = 0b10000;
 
 // Delay for interleaved mode. Set only when ADEN=0
 // circle time = SAMPLE_TIME + CONV. TIME = 1.5 + 8.5 = 10 tics
@@ -37,7 +37,7 @@ uint8_t rccDivider = 0b10001;
 // 0b0001 - 2
 // 0b0010 - 3
 // 0b0011 - 4   MAX: 1011 - 12
-uint8_t interleaveDelay = 0b0001;
+uint8_t interleaveDelay = 0b0010;
 
 //000: 1.5 ADC clock cycles
 //001: 2.5 ADC clock cycles
@@ -54,7 +54,7 @@ uint8_t sampleTime = 0b000;
 // 01: HCLK/1 (Synchronous clock mode) AHB
 // 10: HCLK/2
 // 11: HCLK/4
-uint8_t adcClock = 0b01;
+uint8_t adcClock = 0b00;
 
 #define BUF_SIZE 4096
 uint8_t samplesBuffer[BUF_SIZE];
@@ -129,6 +129,8 @@ void ADC_start() {
 
     // Set Prescaler ADC for Asynchronous clock mode
     MODIFY_REG(RCC->CFGR2, RCC_CFGR2_ADCPRE12_Msk, rccDivider << RCC_CFGR2_ADCPRE12_Pos);
+    // Set ADC clock
+    MODIFY_REG(ADC12_COMMON->CCR, ADC_CCR_CKMODE_Msk, adcClock << ADC_CCR_CKMODE_Pos);
 
     // Set sampling time for channels
     MODIFY_REG(ADC1->SMPR1, ADC_SMPR1_SMP1_Msk, sampleTime << ADC_SMPR1_SMP1_Pos); // ADC1 channel 1
