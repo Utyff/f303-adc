@@ -31,13 +31,13 @@ void DWT_Delay_us(uint32_t us) {
 }
 
 void SystemClock_Config(void) {
-    // External oscillator (HSE) = 8MHz
+    // External oscillator (HSE) = 24MHz
     // SYS_CLK = 72MHz
     // APB1 = 36MHz
     RCC->CR |= RCC_CR_HSEON;           // Enable HSE
     while ((RCC->CR & RCC_CR_HSERDY) == 0);
 
-    RCC->CFGR |= RCC_CFGR_PLLMUL9;     // PLL MUL = x9, SYS_CLK=72MHz (x3 for 24MHz)
+    RCC->CFGR |= RCC_CFGR_PLLMUL3;     // PLL MUL = x9, SYS_CLK=72MHz  (x9 for 8MHz, x3 for 24MHz)
     RCC->CFGR |= RCC_CFGR_PPRE1_DIV2;  // APB1 Prescaler = 2
     RCC->CFGR |= RCC_CFGR_PLLSRC;      // PLL source = HSE
 
@@ -48,6 +48,15 @@ void SystemClock_Config(void) {
     RCC->CFGR |= RCC_CFGR_SW_PLL;      // Select PLL as system clock
 }
 
+int i1=0;
+int i2=0;
+#define TIME_SIZE 20
+int time_i = 0;
+int time[TIME_SIZE];
+uint32_t start;
+uint32_t readFail = 0;
+uint32_t temp;
+
 int main(void) {
     SystemClock_Config();
 
@@ -56,18 +65,43 @@ int main(void) {
 
     // GPIO init
     RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
-    // control bits PB0 PB1 OUT mode & very high speed
-    GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR0_Msk | GPIO_OSPEEDER_OSPEEDR1_Msk;
-    MODIFY_REG(GPIOB->MODER, (GPIO_MODER_MODER0_Msk | GPIO_MODER_MODER0_Msk), (GPIO_MODER_MODER0_0 | GPIO_MODER_MODER1_0));
+    // control bits PB0 PB1 PB2 OUT mode & very high speed
+    GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR0_Msk | GPIO_OSPEEDER_OSPEEDR1_Msk | GPIO_OSPEEDER_OSPEEDR2_Msk;
+    MODIFY_REG(GPIOB->MODER, (GPIO_MODER_MODER0_Msk | GPIO_MODER_MODER1_Msk | GPIO_MODER_MODER2_Msk),
+               (GPIO_MODER_MODER0_0 | GPIO_MODER_MODER1_0 | GPIO_MODER_MODER2_0));
 
+    uint32_t ledTime = 0;
+    const uint32_t MASK = 0xFE000000;
+    // 0x FE 00 00 00
+    // 0x 01 ff ff ff = 2 800 000 us | 33 554 431 > 0,083 ns
     ADC_start();
+    start = DWT->CYCCNT;
 
 #pragma ide diagnostic ignored "EndlessLoop"
     while (1) {
+        i1++;
+        if ((DWT->CYCCNT & MASK) != ledTime) {
+            GPIOB->ODR ^= GPIO_ODR_2; // LED1 toggle
+            ledTime = DWT->CYCCNT & MASK;
+        }
+
+        if ((DWT->CYCCNT - start) > 300000) { // 20720
+            readFail++;
+            temp = ADC1->DR;
+        }
+
         if (samplesReady | samplesError) {
+
+            time[time_i] = DWT->CYCCNT - start;
+            if(++time_i>=TIME_SIZE) time_i = 0;
+
+            i2++;
+
             samplesReady = 0;
             samplesError = 0;
+
             ADC_start();
+            start = DWT->CYCCNT;
         }
     }
 }

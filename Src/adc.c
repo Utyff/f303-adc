@@ -160,6 +160,11 @@ void ADC_start() {
 //    __WFI(); // stop CPU
 }
 
+#define TIM_SIZE 20
+int tim_i = 0;
+int tim[TIM_SIZE];
+uint32_t st;
+
 void DMA_start() {
     // Enable clocks DMA1
     RCC->AHBENR |= RCC_AHBENR_DMA1EN;
@@ -200,6 +205,7 @@ void DMA_start() {
 
     // Enable DMA
     DMA1_Channel1->CCR |= DMA_CCR_EN;
+    st = DWT->CYCCNT;
 
     NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 CH1 interrupt
 }
@@ -209,6 +215,10 @@ uint16_t dmaE = 0;
 
 void DMA1_Channel1_IRQHandler() {
     if (DMA1->ISR & DMA_ISR_TCIF1) { // transfer complete
+
+        tim[tim_i] = DWT->CYCCNT - st;
+        if(++tim_i>=TIM_SIZE) tim_i = 0;
+
         // ADC stop conversion
         ADC1->CR |= ADC_CR_ADSTP;
         samplesReady = 1;
