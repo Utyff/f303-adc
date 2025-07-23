@@ -64,10 +64,10 @@ int main(void) {
     ADC_init();
 
     // GPIO init
-    RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
+    RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
     // control bits PB0 PB1 PB2 OUT mode & very high speed
-    GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR0_Msk | GPIO_OSPEEDER_OSPEEDR1_Msk | GPIO_OSPEEDER_OSPEEDR2_Msk;
-    MODIFY_REG(GPIOB->MODER, (GPIO_MODER_MODER0_Msk | GPIO_MODER_MODER1_Msk | GPIO_MODER_MODER2_Msk),
+    GPIOC->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR0_Msk | GPIO_OSPEEDER_OSPEEDR1_Msk | GPIO_OSPEEDER_OSPEEDR2_Msk;
+    MODIFY_REG(GPIOC->MODER, (GPIO_MODER_MODER0_Msk | GPIO_MODER_MODER1_Msk | GPIO_MODER_MODER2_Msk),
                (GPIO_MODER_MODER0_0 | GPIO_MODER_MODER1_0 | GPIO_MODER_MODER2_0));
 
     uint32_t ledTime = 0;
@@ -81,7 +81,7 @@ int main(void) {
     while (1) {
         i1++;
         if ((DWT->CYCCNT & MASK) != ledTime) {
-            GPIOB->ODR ^= GPIO_ODR_2; // LED1 toggle
+            GPIOC->ODR ^= GPIO_ODR_15; // toggle PC15
             ledTime = DWT->CYCCNT & MASK;
         }
 
